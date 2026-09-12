@@ -1,0 +1,1518 @@
+<!DOCTYPE html>
+<html lang="id" class="h-full bg-[#0b0f17]">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Remind & Buwuhan</title>
+
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        wa: {
+                            50: '#ecfdf5',
+                            100: '#d1fae5',
+                            400: '#34d399',
+                            500: '#10b981',
+                            600: '#059669',
+                            700: '#047857',
+                            800: '#065f46',
+                            900: '#064e3b'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Fonts & Icons -->
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- Firebase SDK Compat -->
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+
+    <!-- Custom Glassmorphism Styles -->
+    <style>
+        body { font-family: 'Plus Jakarta Sans', sans-serif; }
+        .glass-panel {
+            background: rgba(15, 23, 42, 0.75);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+        .glass-card {
+            background: rgba(30, 41, 59, 0.6);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+        }
+        .glass-card:hover {
+            border-color: rgba(16, 185, 129, 0.3);
+            background: rgba(30, 41, 59, 0.85);
+        }
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: rgba(15, 23, 42, 0.6); }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(51, 65, 85, 0.8); border-radius: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #10b981; }
+    </style>
+</head>
+<body class="h-full bg-[#0b0f17] text-slate-100 antialiased flex flex-col min-h-screen selection:bg-wa-500 selection:text-white">
+
+    <!-- Toast Notification Floating Container -->
+    <div id="toastContainer" class="fixed top-12 right-4 left-4 sm:left-auto sm:right-5 z-50 flex flex-col gap-2 max-w-sm w-full pointer-events-none"></div>
+
+    <!-- Header macOS Style -->
+    <header class="bg-slate-950/80 backdrop-blur-md border-b border-slate-800/80 sticky top-0 z-40 px-3 sm:px-6 py-2.5 flex items-center justify-between text-xs">
+        <!-- Left Brand & Subtitle -->
+        <div class="flex items-center gap-2 sm:gap-4">
+            <div class="flex items-center gap-2.5 font-bold text-slate-200 cursor-pointer" onclick="switchTab('dashboard')">
+                <i class="fa-brands fa-whatsapp text-emerald-400 text-lg"></i>
+                <div class="flex flex-col">
+                    <span class="bg-gradient-to-r from-emerald-400 to-teal-200 bg-clip-text text-transparent font-black tracking-wider text-xs sm:text-sm leading-tight">
+                        Remind & Buwuhan
+                    </span>
+                    <span class="text-[9px] text-slate-400 font-medium leading-none mt-0.5">
+                        Catatan Hajatan & Pengingat WA
+                    </span>
+                </div>
+            </div>
+            <span class="hidden sm:inline-block text-slate-700">|</span>
+            <span id="macClock" class="hidden sm:inline-block text-slate-400 font-mono text-[11px]">12:00 PM</span>
+        </div>
+
+        <!-- Right Indicators (Cloud & Fonnte) -->
+        <div class="flex items-center gap-2">
+            <!-- Cloud Status Badge -->
+            <div id="cloudStatusBadge" onclick="switchTab('settings')" class="flex items-center gap-1.5 bg-slate-900/90 border border-slate-800 px-2.5 py-1 rounded-full text-[10px] cursor-pointer hover:border-slate-700">
+                <span id="cloudStatusDot" class="w-2 h-2 rounded-full bg-amber-500"></span>
+                <span id="cloudStatusText" class="text-slate-300 font-medium">Lokal Only</span>
+            </div>
+
+            <!-- Fonnte Status Badge -->
+            <div id="fonnteStatusBadge" onclick="switchTab('settings')" class="flex items-center gap-1.5 bg-slate-900/90 border border-slate-800 px-2.5 py-1 rounded-full text-[10px] cursor-pointer hover:border-slate-700">
+                <span id="fonnteStatusDot" class="w-2 h-2 rounded-full bg-amber-500"></span>
+                <span id="fonnteStatusText" class="hidden sm:inline text-slate-300 font-medium">Fonnte Belum Set</span>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content Container -->
+    <main class="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 lg:px-8 py-5 pb-36 md:pb-32">
+
+        <!-- Banner Alert Fonnte Token -->
+        <div id="fonnteWarningBanner" class="mb-5 bg-gradient-to-r from-amber-950/50 via-amber-900/30 to-slate-900 border border-amber-500/40 rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 backdrop-blur-md">
+            <div class="flex items-center gap-3">
+                <div class="w-9 h-9 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center text-lg flex-shrink-0">
+                    <i class="fa-solid fa-key"></i>
+                </div>
+                <div>
+                    <h4 class="font-bold text-white text-xs">Fonnte WA Gateway Belum Dikonfigurasi!</h4>
+                    <p class="text-[11px] text-slate-400">Masukkan Nomor WA dan Token Fonnte di Pengaturan agar pengingat otomatis dikirim ke HP Anda.</p>
+                </div>
+            </div>
+            <button onclick="switchTab('settings')" class="w-full sm:w-auto bg-amber-500 hover:bg-amber-600 text-slate-950 text-xs font-bold px-3.5 py-2 rounded-xl transition-all text-center whitespace-nowrap">
+                Set Token Fonnte &rarr;
+            </button>
+        </div>
+
+        <!-- TAB 1: DASHBOARD -->
+        <section id="tab-dashboard" class="tab-content space-y-5">
+            <!-- Widget Stats Grid -->
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
+                <div class="glass-panel p-3.5 sm:p-4 rounded-2xl border border-slate-800">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-[10px] font-bold text-slate-400 uppercase">Amplop Masuk</span>
+                        <div class="w-7 h-7 rounded-lg bg-emerald-500/10 text-emerald-400 flex items-center justify-center text-xs">
+                            <i class="fa-solid fa-envelope-open-text"></i>
+                        </div>
+                    </div>
+                    <p id="statBuwuhanMasuk" class="text-xl sm:text-2xl font-black text-emerald-400">0</p>
+                    <p class="text-[10px] text-slate-500 mt-1">Pemberian warga ke acara kita</p>
+                </div>
+
+                <div class="glass-panel p-3.5 sm:p-4 rounded-2xl border border-slate-800">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-[10px] font-bold text-slate-400 uppercase">Kondangan Balasan</span>
+                        <div class="w-7 h-7 rounded-lg bg-amber-500/10 text-amber-400 flex items-center justify-center text-xs">
+                            <i class="fa-solid fa-hand-holding-heart"></i>
+                        </div>
+                    </div>
+                    <p id="statBuwuhanKeluar" class="text-xl sm:text-2xl font-black text-amber-400">0</p>
+                    <p class="text-[10px] text-slate-500 mt-1">Target pengembalian buwuhan</p>
+                </div>
+
+                <div class="glass-panel p-3.5 sm:p-4 rounded-2xl border border-slate-800">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-[10px] font-bold text-slate-400 uppercase">Perlu WA Hari Ini</span>
+                        <div class="w-7 h-7 rounded-lg bg-sky-500/10 text-sky-400 flex items-center justify-center text-xs">
+                            <i class="fa-solid fa-bell"></i>
+                        </div>
+                    </div>
+                    <p id="statUrgentToday" class="text-xl sm:text-2xl font-black text-sky-400">0</p>
+                    <p class="text-[10px] text-slate-500 mt-1">Masuk jadwal H-Minus hari ini</p>
+                </div>
+
+                <div class="glass-panel p-3.5 sm:p-4 rounded-2xl border border-slate-800">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-[10px] font-bold text-slate-400 uppercase">Pengingat Permanen</span>
+                        <div class="w-7 h-7 rounded-lg bg-purple-500/10 text-purple-400 flex items-center justify-center text-xs">
+                            <i class="fa-solid fa-lock"></i>
+                        </div>
+                    </div>
+                    <p id="statPermanentCount" class="text-xl sm:text-2xl font-black text-purple-300">0</p>
+                    <p class="text-[10px] text-slate-500 mt-1">Tahunan, Bulanan & Mingguan</p>
+                </div>
+            </div>
+
+            <!-- Urgent Action Box (Kirim WA Otomatis) -->
+            <div class="glass-panel rounded-2xl border border-slate-800 p-4 sm:p-5 shadow-xl">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 border-b border-slate-800 pb-3">
+                    <div>
+                        <h3 class="font-bold text-white text-sm flex items-center gap-2">
+                            <i class="fa-solid fa-bolt text-amber-400"></i> Notifikasi & Pengingat WA Hari Ini
+                        </h3>
+                        <p class="text-[11px] text-slate-400">Daftar hajatan atau pengingat yang cocok dengan skema H-Minus</p>
+                    </div>
+                    <button onclick="triggerAutoSendAllToday()" class="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs px-3.5 py-2.5 rounded-xl transition-all shadow flex items-center justify-center gap-2">
+                        <i class="fa-brands fa-whatsapp text-sm"></i> Kirim Semua WA Hari Ini
+                    </button>
+                </div>
+
+                <div id="dashUrgentList" class="space-y-3">
+                    <!-- Dynamic populated -->
+                </div>
+            </div>
+        </section>
+
+        <!-- TAB 2: BUKU BUWUHAN -->
+        <section id="tab-buwuhan" class="tab-content hidden space-y-5">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 glass-panel p-4 sm:p-5 rounded-2xl border border-slate-800">
+                <div>
+                    <h2 class="font-extrabold text-white text-base flex items-center gap-2">
+                        <i class="fa-solid fa-book-bookmark text-emerald-400"></i> Buku Rekap Buwuhan / Hajatan
+                    </h2>
+                    <p class="text-xs text-slate-400 mt-0.5">Catatan pencatatan amplop masuk dari tetangga & pengingat kondangan balasan</p>
+                </div>
+                <div class="flex items-center gap-2">
+                    <button onclick="openBuwuhanModal('MASUK')" class="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs px-4 py-2.5 rounded-xl transition-all shadow flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-plus"></i> Catat Buwuhan / Amplop
+                    </button>
+                </div>
+            </div>
+
+            <!-- Filter Buttons & Search Buwuhan -->
+            <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+                <div class="flex items-center gap-1.5 bg-slate-900/80 p-1 rounded-xl border border-slate-800 w-full sm:w-auto">
+                    <button onclick="filterBuwuhanTab('ALL')" id="buwFilter-ALL" class="flex-1 sm:flex-none px-3 py-1.5 rounded-lg text-xs font-bold text-white bg-emerald-600 transition-all">
+                        Semua
+                    </button>
+                    <button onclick="filterBuwuhanTab('MASUK')" id="buwFilter-MASUK" class="flex-1 sm:flex-none px-3 py-1.5 rounded-lg text-xs font-bold text-slate-400 hover:text-white transition-all">
+                        Amplop Masuk
+                    </button>
+                    <button onclick="filterBuwuhanTab('KELUAR')" id="buwFilter-KELUAR" class="flex-1 sm:flex-none px-3 py-1.5 rounded-lg text-xs font-bold text-slate-400 hover:text-white transition-all">
+                        Kondangan Balasan
+                    </button>
+                </div>
+
+                <div class="relative w-full sm:w-64">
+                    <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-xs"></i>
+                    <input type="text" id="searchBuwuhanInput" oninput="renderBuwuhanTab()" placeholder="Cari nama tetangga..." class="w-full pl-9 pr-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:ring-1 focus:ring-emerald-500">
+                </div>
+            </div>
+
+            <!-- List Cards Buwuhan -->
+            <div id="buwuhanGrid" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <!-- Populated dynamically -->
+            </div>
+        </section>
+
+        <!-- TAB 3: PENGINGAT PERMANEN & FLEKSIBEL -->
+        <section id="tab-reminders" class="tab-content hidden space-y-5">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 glass-panel p-4 sm:p-5 rounded-2xl border border-slate-800">
+                <div>
+                    <h2 class="font-extrabold text-white text-base flex items-center gap-2">
+                        <i class="fa-solid fa-bell text-sky-400"></i> Pengingat Permanen & Fleksibel
+                    </h2>
+                    <p class="text-xs text-slate-400 mt-0.5">Jadwal rutin tahunan (STNK/Ultah), bulanan (Listrik/WiFi), mingguan & pengingat fleksibel</p>
+                </div>
+                <button onclick="openReminderModal()" class="w-full sm:w-auto bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs px-4 py-2.5 rounded-xl transition-all shadow flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-plus"></i> Buat Pengingat
+                </button>
+            </div>
+
+            <!-- Filter Bar Pengingat -->
+            <div class="flex flex-wrap items-center justify-between gap-3 bg-slate-900/80 p-3 rounded-2xl border border-slate-800">
+                <div class="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+                    <select id="filterReminderType" onchange="renderRemindersTab()" class="bg-slate-950 border border-slate-800 text-slate-300 text-xs rounded-xl px-3 py-2 focus:outline-none flex-1 sm:flex-none">
+                        <option value="ALL">🛡️ Semua Sifat (Permanen & Fleksibel)</option>
+                        <option value="permanent">🔒 Permanen Sahaja</option>
+                        <option value="flexible">✏️ Fleksibel Sahaja</option>
+                    </select>
+
+                    <select id="filterReminderRepeat" onchange="renderRemindersTab()" class="bg-slate-950 border border-slate-800 text-slate-300 text-xs rounded-xl px-3 py-2 focus:outline-none flex-1 sm:flex-none">
+                        <option value="ALL">🔄 Semua Siklus</option>
+                        <option value="yearly">Tahunan</option>
+                        <option value="monthly">Bulanan</option>
+                        <option value="weekly">Mingguan</option>
+                        <option value="once">Sekali Saja</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Reminders Grid -->
+            <div id="remindersGrid" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <!-- Populated dynamically -->
+            </div>
+        </section>
+
+        <!-- TAB 4: SETTINGS -->
+        <section id="tab-settings" class="tab-content hidden max-w-2xl mx-auto space-y-5">
+            <div class="glass-panel p-5 sm:p-6 rounded-2xl border border-slate-800 space-y-5 shadow-2xl">
+                <div>
+                    <h2 class="text-base font-extrabold text-white flex items-center gap-2">
+                        <i class="fa-brands fa-whatsapp text-emerald-400 text-xl"></i> Pengaturan WA Gateway & Firebase Cloud
+                    </h2>
+                    <p class="text-xs text-slate-400 mt-1">Konfigurasi Fonnte API & kredensial Firebase agar data tersinkron antar HP/Netlify.</p>
+                </div>
+
+                <hr class="border-slate-800">
+
+                <form onsubmit="saveSettingsForm(event)" class="space-y-4 text-xs">
+                    <!-- WA Settings -->
+                    <div class="p-3.5 bg-slate-950/80 border border-slate-800 rounded-xl space-y-3">
+                        <h4 class="font-bold text-emerald-400 text-xs flex items-center gap-1.5">
+                            <i class="fa-brands fa-whatsapp"></i> 1. Fonnte WhatsApp Gateway
+                        </h4>
+                        <div>
+                            <label class="block font-bold text-slate-300 mb-1 uppercase">Nomor WA Penerima Notifikasi (62) *</label>
+                            <input type="text" id="settingWaNumber" placeholder="Contoh: 6281234567890" class="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-white font-mono focus:ring-1 focus:ring-emerald-500 focus:outline-none" required>
+                        </div>
+                        <div>
+                            <label class="block font-bold text-slate-300 mb-1 uppercase">Fonnte API Token *</label>
+                            <input type="text" id="settingFonnteToken" placeholder="Tempel Fonnte Token dari fonnte.com" class="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-emerald-400 font-mono focus:ring-1 focus:ring-emerald-500 focus:outline-none" required>
+                        </div>
+                    </div>
+
+                    <!-- Firebase Config Input -->
+                    <div class="p-3.5 bg-slate-950/80 border border-slate-800 rounded-xl space-y-3">
+                        <div class="flex items-center justify-between">
+                            <h4 class="font-bold text-sky-400 text-xs flex items-center gap-1.5">
+                                <i class="fa-solid fa-cloud"></i> 2. Firebase Cloud Credentials (remindnbuwuhan)
+                            </h4>
+                            <span id="firebaseStatusBadge" class="text-[9px] px-2 py-0.5 rounded font-bold bg-amber-500/10 text-amber-400 border border-amber-500/30">
+                                Pending
+                            </span>
+                        </div>
+                        <p class="text-[10px] text-slate-400">
+                            Objek <code>firebaseConfig</code> proyek <b>remindnbuwuhan</b> sudah terhubung secara otomatis.
+                        </p>
+                        <textarea id="settingFirebaseConfigJSON" rows="4" placeholder='{"apiKey": "AIzaSy...", "authDomain": "remindnbuwuhan.firebaseapp.com", ...}' class="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-sky-300 font-mono text-[10px] focus:ring-1 focus:ring-sky-500 focus:outline-none"></textarea>
+                    </div>
+
+                    <button id="saveSettingsBtn" type="submit" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 rounded-xl shadow transition-all">
+                        Simpan Pengaturan & Hubungkan Cloud
+                    </button>
+                </form>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Fixed Dock Bottom Navbar -->
+    <div class="fixed bottom-3 left-1/2 -translate-x-1/2 bg-slate-900/90 border border-slate-800 backdrop-blur-xl px-3 sm:px-5 py-2 rounded-2xl shadow-2xl z-40 flex items-center gap-3 md:gap-6">
+        <button onclick="switchTab('dashboard')" id="dock-dashboard" class="dock-btn flex flex-col items-center gap-1 text-[10px] font-bold text-emerald-400 transition-all">
+            <div class="w-9 h-9 rounded-xl bg-slate-800/80 border border-slate-700/60 flex items-center justify-center text-sm">
+                <i class="fa-solid fa-chart-pie"></i>
+            </div>
+            <span>Dasbor</span>
+        </button>
+
+        <button onclick="switchTab('buwuhan')" id="dock-buwuhan" class="dock-btn flex flex-col items-center gap-1 text-[10px] font-bold text-slate-400 hover:text-white transition-all">
+            <div class="w-9 h-9 rounded-xl bg-slate-800/80 border border-slate-700/60 flex items-center justify-center text-sm relative">
+                <i class="fa-solid fa-book-bookmark"></i>
+            </div>
+            <span>Buwuhan</span>
+        </button>
+
+        <button onclick="switchTab('reminders')" id="dock-reminders" class="dock-btn flex flex-col items-center gap-1 text-[10px] font-bold text-slate-400 hover:text-white transition-all">
+            <div class="w-9 h-9 rounded-xl bg-slate-800/80 border border-slate-700/60 flex items-center justify-center text-sm">
+                <i class="fa-solid fa-bell"></i>
+            </div>
+            <span>Pengingat</span>
+        </button>
+
+        <button onclick="switchTab('settings')" id="dock-settings" class="dock-btn flex flex-col items-center gap-1 text-[10px] font-bold text-slate-400 hover:text-white transition-all">
+            <div class="w-9 h-9 rounded-xl bg-slate-800/80 border border-slate-700/60 flex items-center justify-center text-sm">
+                <i class="fa-solid fa-gear"></i>
+            </div>
+            <span>Setting</span>
+        </button>
+    </div>
+
+    <!-- MODAL 1: BUWUHAN FORM -->
+    <div id="buwuhanModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 hidden flex items-center justify-center p-3 sm:p-4">
+        <div class="glass-panel border border-slate-800 rounded-2xl max-w-md w-full p-5 sm:p-6 space-y-4 max-h-[90vh] overflow-y-auto custom-scrollbar">
+            <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+                <h3 id="buwModalTitle" class="font-bold text-white text-sm">Catat Buwuhan / Amplop Hajatan</h3>
+                <button onclick="closeModal('buwuhanModal')" class="text-slate-400 hover:text-white p-1">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <form onsubmit="handleSaveBuwuhan(event)" class="space-y-3 text-xs">
+                <input type="hidden" id="buwuhanId">
+
+                <div>
+                    <label class="block font-bold text-slate-300 mb-1">Arah Catatan *</label>
+                    <select id="buwArah" onchange="handleArahChange()" class="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white focus:outline-none focus:ring-1 focus:ring-emerald-500">
+                        <option value="MASUK">AMPLOP MASUK (Orang nyumbang ke Acara Kita)</option>
+                        <option value="KELUAR">KONDANGAN BALASAN (Kita nyumbang ke Acara Tetangga)</option>
+                    </select>
+                </div>
+
+                <div id="quickSelectBox" class="p-3 bg-emerald-950/30 border border-emerald-500/30 rounded-xl space-y-1.5 hidden">
+                    <label class="block font-bold text-emerald-400 text-[11px]">
+                        ⚡ Pilih Dari Daftar Amplop Masuk (Auto-Fill Balasan):
+                    </label>
+                    <select id="buwQuickSelect" onchange="applyQuickSelectNeighbor(this.value)" class="w-full px-2.5 py-1.5 bg-slate-950 border border-slate-800 rounded-lg text-slate-200 focus:outline-none">
+                        <option value="">-- Pilih Nama Tetangga Yang Pernah Nyumbang --</option>
+                    </select>
+                    <p class="text-[10px] text-slate-400">Pilih nama untuk otomatis mengisi nominal/kado yang pernah mereka berikan dulu.</p>
+                </div>
+
+                <div>
+                    <label class="block font-bold text-slate-300 mb-1">Nama Tetangga / Saudara *</label>
+                    <input type="text" id="buwNama" required oninput="autoLookupHistory(this.value)" placeholder="Contoh: Pak RT Sukirman" class="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white focus:outline-none focus:ring-1 focus:ring-emerald-500">
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block font-bold text-slate-300 mb-1">Alamat</label>
+                        <input type="text" id="buwAlamat" placeholder="Dusun Krajan, RT 02" class="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block font-bold text-slate-300 mb-1">Acara *</label>
+                        <input type="text" id="buwAcara" required placeholder="Nikahan / Sunatan" class="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white focus:outline-none">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block font-bold text-slate-300 mb-1">Tanggal Acara *</label>
+                        <input type="date" id="buwTanggal" required class="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block font-bold text-slate-300 mb-1">Tipe Sumbangan</label>
+                        <select id="buwTipe" onchange="toggleTipeInput()" class="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white focus:outline-none">
+                            <option value="UANG">UANG (Rp)</option>
+                            <option value="BARANG">BARANG (Beras, dll)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 gap-3">
+                    <div id="nominalBox">
+                        <label class="block font-bold text-slate-300 mb-1">Nominal Sumbangan (Rp)</label>
+                        <input type="number" id="buwNominal" placeholder="100000" class="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white focus:outline-none">
+                    </div>
+                    <div id="barangBox" class="hidden">
+                        <label class="block font-bold text-slate-300 mb-1">Detail Barang / Kado</label>
+                        <input type="text" id="buwKeterangan" placeholder="Beras 5kg + Gula 2kg" class="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white focus:outline-none">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block font-bold text-slate-300 mb-1">Histori Pemberian Lalu (Auto-Detector)</label>
+                    <textarea id="buwHistori" rows="2" placeholder="Catatan histori pemberian masa lalu..." class="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-slate-300 focus:outline-none"></textarea>
+                </div>
+
+                <!-- Custom H-Minus Selector for Buwuhan -->
+                <div class="p-3 bg-slate-950 border border-slate-800 rounded-xl space-y-1.5">
+                    <label class="block font-bold text-slate-300 text-[11px]">Skema Notifikasi WA (H-Minus Custom) *</label>
+                    <div class="grid grid-cols-4 gap-1.5">
+                        <label class="flex items-center gap-1.5 bg-slate-900 px-2 py-1.5 rounded-lg border border-slate-800 text-[11px] text-slate-300 cursor-pointer">
+                            <input type="checkbox" name="buwHOption" value="7" class="rounded text-emerald-500"> H-7
+                        </label>
+                        <label class="flex items-center gap-1.5 bg-slate-900 px-2 py-1.5 rounded-lg border border-slate-800 text-[11px] text-slate-300 cursor-pointer">
+                            <input type="checkbox" name="buwHOption" value="3" checked class="rounded text-emerald-500"> H-3
+                        </label>
+                        <label class="flex items-center gap-1.5 bg-slate-900 px-2 py-1.5 rounded-lg border border-slate-800 text-[11px] text-slate-300 cursor-pointer">
+                            <input type="checkbox" name="buwHOption" value="1" checked class="rounded text-emerald-500"> H-1
+                        </label>
+                        <label class="flex items-center gap-1.5 bg-slate-900 px-2 py-1.5 rounded-lg border border-slate-800 text-[11px] text-emerald-400 font-bold cursor-pointer">
+                            <input type="checkbox" name="buwHOption" value="0" checked class="rounded text-emerald-500"> Hari H
+                        </label>
+                    </div>
+                </div>
+
+                <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2.5 rounded-xl transition-all shadow">
+                    Simpan Data Buwuhan
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL 2: GENERAL REMINDER FORM -->
+    <div id="reminderModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 hidden flex items-center justify-center p-3 sm:p-4">
+        <div class="glass-panel border border-slate-800 rounded-2xl max-w-md w-full p-5 sm:p-6 space-y-4 max-h-[90vh] overflow-y-auto custom-scrollbar">
+            <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+                <h3 id="remModalTitle" class="font-bold text-white text-sm">Buat Pengingat Baru</h3>
+                <button onclick="closeModal('reminderModal')" class="text-slate-400 hover:text-white p-1">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <form onsubmit="handleSaveReminder(event)" class="space-y-3 text-xs">
+                <input type="hidden" id="remId">
+
+                <div>
+                    <label class="block font-bold text-slate-300 mb-1">Sifat Pengingat *</label>
+                    <select id="remType" class="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white focus:outline-none">
+                        <option value="permanent">🔒 PERMANEN (Penting & Rutin)</option>
+                        <option value="flexible">✏️ FLEKSIBEL (Bebas Edit/Hapus)</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block font-bold text-slate-300 mb-1">Nama Pengingat / Event *</label>
+                    <input type="text" id="remTitle" required placeholder="Contoh: Bayar Pajak STNK Vario" class="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white focus:outline-none">
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block font-bold text-slate-300 mb-1">Pengulangan Siklus *</label>
+                        <select id="remRepeat" class="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white focus:outline-none">
+                            <option value="yearly">Tahunan (Pajak/Ultah)</option>
+                            <option value="monthly">Bulanan (Listrik/WiFi)</option>
+                            <option value="weekly">Mingguan (Pengajian/Piket)</option>
+                            <option value="once">Sekali Saja</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block font-bold text-slate-300 mb-1">Tanggal *</label>
+                        <input type="date" id="remDate" required class="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white focus:outline-none">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block font-bold text-slate-300 mb-1">Catatan / Persiapan</label>
+                    <textarea id="remNotes" rows="2" placeholder="Catatan atau hal yang perlu disiapkan..." class="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-slate-300 focus:outline-none"></textarea>
+                </div>
+
+                <!-- Custom H-Minus Selector for Reminders -->
+                <div class="p-3 bg-slate-950 border border-slate-800 rounded-xl space-y-1.5">
+                    <label class="block font-bold text-slate-300 text-[11px]">Skema Notifikasi WA (H-Minus Custom) *</label>
+                    <div class="grid grid-cols-4 gap-1.5">
+                        <label class="flex items-center gap-1.5 bg-slate-900 px-2 py-1.5 rounded-lg border border-slate-800 text-[11px] text-slate-300 cursor-pointer">
+                            <input type="checkbox" name="remHOption" value="7" class="rounded text-sky-500"> H-7
+                        </label>
+                        <label class="flex items-center gap-1.5 bg-slate-900 px-2 py-1.5 rounded-lg border border-slate-800 text-[11px] text-slate-300 cursor-pointer">
+                            <input type="checkbox" name="remHOption" value="3" checked class="rounded text-sky-500"> H-3
+                        </label>
+                        <label class="flex items-center gap-1.5 bg-slate-900 px-2 py-1.5 rounded-lg border border-slate-800 text-[11px] text-slate-300 cursor-pointer">
+                            <input type="checkbox" name="remHOption" value="1" checked class="rounded text-sky-500"> H-1
+                        </label>
+                        <label class="flex items-center gap-1.5 bg-slate-900 px-2 py-1.5 rounded-lg border border-slate-800 text-[11px] text-sky-400 font-bold cursor-pointer">
+                            <input type="checkbox" name="remHOption" value="0" checked class="rounded text-sky-500"> Hari H
+                        </label>
+                    </div>
+                </div>
+
+                <button type="submit" class="w-full bg-sky-600 hover:bg-sky-500 text-white font-bold py-2.5 rounded-xl transition-all shadow">
+                    Simpan Pengingat
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL 3: PREVIEW & KIRIM WA (FONNTE) -->
+    <div id="dispatchModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 hidden flex items-center justify-center p-3 sm:p-4">
+        <div class="glass-panel border border-slate-800 rounded-2xl max-w-md w-full p-5 sm:p-6 space-y-4">
+            <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+                <div class="flex items-center gap-2">
+                    <i class="fa-brands fa-whatsapp text-emerald-400 text-lg"></i>
+                    <h3 class="font-bold text-white text-sm">Pratinjau Pesan WA Fonnte</h3>
+                </div>
+                <button onclick="closeModal('dispatchModal')" class="text-slate-400 hover:text-white">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <div class="bg-[#0b141a] border border-slate-800 p-4 rounded-xl text-xs space-y-2">
+                <p class="text-slate-400">Penerima: <b id="previewWaPhone" class="text-emerald-400 font-mono">+62...</b></p>
+                <div id="previewWaMessage" class="bg-[#005c4b] text-white p-3 rounded-xl whitespace-pre-wrap font-sans leading-relaxed">
+                    <!-- Dynamic message -->
+                </div>
+            </div>
+
+            <div class="flex items-center justify-end gap-2 pt-2 text-xs">
+                <button onclick="closeModal('dispatchModal')" class="px-3.5 py-2 font-bold text-slate-400 hover:bg-slate-800 rounded-xl">
+                    Batal
+                </button>
+                <button onclick="executeFonnteSend()" class="bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-4 py-2 rounded-xl shadow flex items-center gap-2">
+                    <i class="fa-brands fa-whatsapp"></i> Kirim Via Fonnte Sekarang
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MAIN JAVASCRIPT LOGIC -->
+    <script>
+        // Storage Keys
+        const BUWUHAN_KEY = 'remind_buwuhan_data_v1';
+        const REMINDERS_KEY = 'remind_general_data_v1';
+        const SETTINGS_KEY = 'remind_settings_v1';
+
+        // Default Firebase Credentials for remindnbuwuhan
+        const DEFAULT_FIREBASE_CONFIG = {
+            apiKey: "AIzaSyBFCIsDbJKnIkOIaBw-nfuJ70_tOseIdF8",
+            authDomain: "remindnbuwuhan.firebaseapp.com",
+            projectId: "remindnbuwuhan",
+            storageBucket: "remindnbuwuhan.firebasestorage.app",
+            messagingSenderId: "742346007139",
+            appId: "1:742346007139:web:4c498d032ce8c84af08e56",
+            measurementId: "G-326HNXT8RD"
+        };
+
+        // App State
+        let buwuhanList = [];
+        let remindersList = [];
+        let appSettings = {
+            waNumber: '',
+            fonnteToken: '',
+            firebaseConfigStr: JSON.stringify(DEFAULT_FIREBASE_CONFIG, null, 2)
+        };
+
+        let currentBuwuhanFilter = 'ALL';
+        let db = null;
+        let isCloudConnected = false;
+        let activeDispatchPayload = null;
+
+        // Initialize App on Load
+        window.addEventListener('DOMContentLoaded', () => {
+            startClock();
+            loadSettings();
+            initFirebaseConnection();
+            loadDataFromLocal();
+            renderAllTabs();
+            checkAutoTodayAlerts();
+        });
+
+        function startClock() {
+            setInterval(() => {
+                const now = new Date();
+                document.getElementById('macClock').textContent = now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+            }, 1000);
+        }
+
+        // --- SETTINGS & FIREBASE INIT ---
+        function loadSettings() {
+            const saved = localStorage.getItem(SETTINGS_KEY);
+            if (saved) {
+                try {
+                    appSettings = { ...appSettings, ...JSON.parse(saved) };
+                } catch(e) { console.error(e); }
+            }
+
+            document.getElementById('settingWaNumber').value = appSettings.waNumber || '';
+            document.getElementById('settingFonnteToken').value = appSettings.fonnteToken || '';
+            document.getElementById('settingFirebaseConfigJSON').value = appSettings.firebaseConfigStr || JSON.stringify(DEFAULT_FIREBASE_CONFIG, null, 2);
+
+            updateBadgesUI();
+        }
+
+        function saveSettingsForm(e) {
+            e.preventDefault();
+            const waNum = document.getElementById('settingWaNumber').value.trim().replace(/[^0-9]/g, '');
+            const token = document.getElementById('settingFonnteToken').value.trim();
+            const configText = document.getElementById('settingFirebaseConfigJSON').value.trim();
+
+            if (!waNum || !token) {
+                showToast('Isi Nomor WA dan Token Fonnte!', 'error');
+                return;
+            }
+
+            appSettings.waNumber = waNum;
+            appSettings.fonnteToken = token;
+            appSettings.firebaseConfigStr = configText;
+
+            localStorage.setItem(SETTINGS_KEY, JSON.stringify(appSettings));
+            showToast('Pengaturan disimpan!', 'success');
+            
+            updateBadgesUI();
+            initFirebaseConnection();
+        }
+
+        function initFirebaseConnection() {
+            try {
+                let cfgObj = DEFAULT_FIREBASE_CONFIG;
+                if (appSettings.firebaseConfigStr) {
+                    try {
+                        let cleanStr = appSettings.firebaseConfigStr.trim();
+                        if (cleanStr.startsWith("const") || cleanStr.includes("=")) {
+                            cleanStr = cleanStr.substring(cleanStr.indexOf("{"), cleanStr.lastIndexOf("}") + 1);
+                        }
+                        cfgObj = JSON.parse(cleanStr);
+                    } catch(err) {
+                        cfgObj = DEFAULT_FIREBASE_CONFIG;
+                    }
+                }
+
+                if (!firebase.apps.length) {
+                    firebase.initializeApp(cfgObj);
+                }
+                db = firebase.firestore();
+                isCloudConnected = true;
+
+                updateCloudStatusBadge(true);
+                listenFirestoreRealtime();
+            } catch (err) {
+                console.warn("Firebase Init Offline Fallback:", err);
+                isCloudConnected = false;
+                updateCloudStatusBadge(false);
+            }
+        }
+
+        function updateBadgesUI() {
+            const fonnteDot = document.getElementById('fonnteStatusDot');
+            const fonnteText = document.getElementById('fonnteStatusText');
+            const banner = document.getElementById('fonnteWarningBanner');
+
+            if (appSettings.fonnteToken && appSettings.waNumber) {
+                fonnteDot.className = "w-2 h-2 rounded-full bg-emerald-500 animate-pulse";
+                fonnteText.textContent = "Fonnte Ready";
+                banner.classList.add('hidden');
+            } else {
+                fonnteDot.className = "w-2 h-2 rounded-full bg-amber-500";
+                fonnteText.textContent = "Fonnte Belum Set";
+                banner.classList.remove('hidden');
+            }
+        }
+
+        function updateCloudStatusBadge(online) {
+            const dot = document.getElementById('cloudStatusDot');
+            const text = document.getElementById('cloudStatusText');
+            const badge = document.getElementById('firebaseStatusBadge');
+
+            if (online) {
+                dot.className = "w-2 h-2 rounded-full bg-emerald-500 animate-pulse";
+                text.textContent = "☁️ Sinkron";
+                if (badge) {
+                    badge.className = "text-[9px] px-2 py-0.5 rounded font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30";
+                    badge.textContent = "Sinkron";
+                }
+            } else {
+                dot.className = "w-2 h-2 rounded-full bg-amber-500";
+                text.textContent = "Lokal Only";
+                if (badge) {
+                    badge.className = "text-[9px] px-2 py-0.5 rounded font-bold bg-amber-500/10 text-amber-400 border border-amber-500/30";
+                    badge.textContent = "Lokal Only";
+                }
+            }
+        }
+
+        // --- DATA STORAGE & FIRESTORE REALTIME SYNC ---
+        function loadDataFromLocal() {
+            const bSaved = localStorage.getItem(BUWUHAN_KEY);
+            if (bSaved) {
+                try { buwuhanList = JSON.parse(bSaved); } catch(e) {}
+            } else {
+                buwuhanList = [
+                    {
+                        id: 'buw_1',
+                        nama: 'Pak RT Sukirman',
+                        alamat: 'Dusun Krajan RT 02',
+                        acara: 'Nikahan Anaknya',
+                        tanggal: getFutureDateISO(1),
+                        tipe: 'UANG',
+                        nominal: 100000,
+                        keterangan: '',
+                        arah: 'KELUAR',
+                        histori: 'Pak RT pernah nyumbang Rp 100.000 pas sunatan anak kita',
+                        hOptions: [7, 3, 1, 0]
+                    },
+                    {
+                        id: 'buw_2',
+                        nama: 'Mbah Sastro',
+                        alamat: 'RT 03 Krajan',
+                        acara: 'Sunatan Cucu',
+                        tanggal: getFutureDateISO(-20),
+                        tipe: 'UANG',
+                        nominal: 150000,
+                        keterangan: '',
+                        arah: 'MASUK',
+                        histori: 'Amplop masuk dari Mbah Sastro',
+                        hOptions: [3, 1, 0]
+                    }
+                ];
+                saveLocalBuwuhan();
+            }
+
+            const rSaved = localStorage.getItem(REMINDERS_KEY);
+            if (rSaved) {
+                try { remindersList = JSON.parse(rSaved); } catch(e) {}
+            } else {
+                remindersList = [
+                    {
+                        id: 'rem_1',
+                        type: 'permanent',
+                        title: 'Ulang Tahun Istri 💖',
+                        repeat: 'yearly',
+                        date: getFutureDateISO(3),
+                        hOptions: [7, 3, 1, 0],
+                        notes: 'Beli kue cokelat & tas kado'
+                    },
+                    {
+                        id: 'rem_2',
+                        type: 'flexible',
+                        title: 'Bayar Pajak Motor STNK 🛵',
+                        repeat: 'yearly',
+                        date: getFutureDateISO(12),
+                        hOptions: [7, 3, 1, 0],
+                        notes: 'Siapkan KTP Asli & BPKB'
+                    }
+                ];
+                saveLocalReminders();
+            }
+        }
+
+        function saveLocalBuwuhan() {
+            localStorage.setItem(BUWUHAN_KEY, JSON.stringify(buwuhanList));
+        }
+
+        function saveLocalReminders() {
+            localStorage.setItem(REMINDERS_KEY, JSON.stringify(remindersList));
+        }
+
+        function listenFirestoreRealtime() {
+            if (!db) return;
+
+            db.collection('buwuhan').onSnapshot((snapshot) => {
+                const cloudData = [];
+                snapshot.forEach(doc => cloudData.push({ ...doc.data(), id: doc.id }));
+                buwuhanList = cloudData;
+                saveLocalBuwuhan();
+                renderAllTabs();
+            }, (err) => console.warn("Firestore Buwuhan Listener Error:", err));
+
+            db.collection('reminders').onSnapshot((snapshot) => {
+                const cloudData = [];
+                snapshot.forEach(doc => cloudData.push({ ...doc.data(), id: doc.id }));
+                remindersList = cloudData;
+                saveLocalReminders();
+                renderAllTabs();
+            }, (err) => console.warn("Firestore Reminders Listener Error:", err));
+        }
+
+        function syncBuwuhanToCloud(item) {
+            saveLocalBuwuhan();
+            if (isCloudConnected && db) {
+                db.collection('buwuhan').doc(item.id).set(item, { merge: true })
+                  .catch(e => console.error("Cloud Save Error:", e));
+            }
+        }
+
+        function syncReminderToCloud(item) {
+            saveLocalReminders();
+            if (isCloudConnected && db) {
+                db.collection('reminders').doc(item.id).set(item, { merge: true })
+                  .catch(e => console.error("Cloud Save Error:", e));
+            }
+        }
+
+        // --- EXPLICIT DELETE FUNCTIONS ---
+        window.deleteBuwuhan = function(id) {
+            if (!id) return;
+            const item = buwuhanList.find(b => b.id === id);
+            const namaItem = item ? item.nama : 'catatan ini';
+
+            if (confirm(`Apakah Anda yakin ingin menghapus catatan buwuhan "${namaItem}"?`)) {
+                // Remove locally immediately
+                buwuhanList = buwuhanList.filter(b => b.id !== id);
+                saveLocalBuwuhan();
+                renderAllTabs();
+
+                // Remove from Cloud
+                if (isCloudConnected && db) {
+                    db.collection('buwuhan').doc(id).delete()
+                        .then(() => console.log('Successfully deleted from Firestore:', id))
+                        .catch(e => console.error("Cloud Delete Error:", e));
+                }
+                showToast('Catatan buwuhan telah dihapus.', 'info');
+            }
+        };
+
+        window.deleteReminder = function(id) {
+            if (!id) return;
+            const item = remindersList.find(r => r.id === id);
+            const titleItem = item ? item.title : 'pengingat ini';
+
+            if (confirm(`Apakah Anda yakin ingin menghapus pengingat "${titleItem}"?`)) {
+                // Remove locally immediately
+                remindersList = remindersList.filter(r => r.id !== id);
+                saveLocalReminders();
+                renderAllTabs();
+
+                // Remove from Cloud
+                if (isCloudConnected && db) {
+                    db.collection('reminders').doc(id).delete()
+                        .then(() => console.log('Successfully deleted from Firestore:', id))
+                        .catch(e => console.error("Cloud Delete Error:", e));
+                }
+                showToast('Pengingat telah dihapus.', 'info');
+            }
+        };
+
+        // --- HELPER DATES ---
+        function getFutureDateISO(addDays) {
+            const d = new Date();
+            d.setDate(d.getDate() + addDays);
+            return d.toISOString().split('T')[0];
+        }
+
+        function getDaysDiff(dateStr) {
+            const today = new Date();
+            today.setHours(0,0,0,0);
+            const target = new Date(dateStr + 'T00:00:00');
+            const diffTime = target - today;
+            return Math.round(diffTime / (1000 * 60 * 60 * 24));
+        }
+
+        function formatDateIndo(dateStr) {
+            if (!dateStr) return '-';
+            const d = new Date(dateStr + 'T00:00:00');
+            return d.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
+        }
+
+        function getStatusBadgeMarkup(days) {
+            if (days === 0) return `<span class="text-[9px] font-bold px-2 py-0.5 rounded bg-red-500 text-white animate-pulse">HARI H 🎉</span>`;
+            if (days > 0) return `<span class="text-[9px] font-bold px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30">H-${days}</span>`;
+            return `<span class="text-[9px] font-bold px-2 py-0.5 rounded bg-slate-800 text-slate-400">Lewat ${Math.abs(days)} hr</span>`;
+        }
+
+        // --- RENDERING TABS ---
+        function renderAllTabs() {
+            renderDashboard();
+            renderBuwuhanTab();
+            renderRemindersTab();
+        }
+
+        function renderDashboard() {
+            const masukCount = buwuhanList.filter(b => b.arah === 'MASUK').length;
+            const keluarCount = buwuhanList.filter(b => b.arah === 'KELUAR').length;
+            const permCount = remindersList.filter(r => r.type === 'permanent').length;
+
+            document.getElementById('statBuwuhanMasuk').textContent = masukCount;
+            document.getElementById('statBuwuhanKeluar').textContent = keluarCount;
+            document.getElementById('statPermanentCount').textContent = permCount;
+
+            const urgentContainer = document.getElementById('dashUrgentList');
+            urgentContainer.innerHTML = '';
+
+            let urgentTodayCount = 0;
+
+            const allItems = [
+                ...buwuhanList.map(b => ({ ...b, itemType: 'buwuhan' })),
+                ...remindersList.map(r => ({ ...r, itemType: 'reminder' }))
+            ];
+
+            allItems.forEach(item => {
+                const diff = getDaysDiff(item.tanggal || item.date);
+                const hOpts = item.hOptions || [3, 1, 0];
+                
+                if (hOpts.includes(diff)) {
+                    urgentTodayCount++;
+                    urgentContainer.appendChild(createUrgentCardRow(item, diff));
+                }
+            });
+
+            document.getElementById('statUrgentToday').textContent = urgentTodayCount;
+
+            if (urgentTodayCount === 0) {
+                urgentContainer.innerHTML = `
+                    <div class="text-center py-6 text-slate-400 text-xs">
+                        <i class="fa-solid fa-circle-check text-emerald-400 text-2xl mb-2"></i>
+                        <p class="font-bold text-white">Tidak Ada Pengingat WA Yang Cocok Hari Ini</p>
+                        <p class="text-[10px] text-slate-500">Notifikasi otomatis terpicu begitu masuk ke tanggal H-Minus pilihan Anda.</p>
+                    </div>
+                `;
+            }
+        }
+
+        function createUrgentCardRow(item, diff) {
+            const div = document.createElement('div');
+            const isBuwuhan = item.itemType === 'buwuhan';
+            const title = isBuwuhan ? `${item.nama} (${item.acara})` : item.title;
+            const dateStr = item.tanggal || item.date;
+
+            div.className = "p-3.5 rounded-xl border border-slate-800 bg-slate-950/60 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3";
+            div.innerHTML = `
+                <div class="flex items-start gap-3">
+                    <div class="w-9 h-9 rounded-xl ${diff === 0 ? 'bg-red-500/20 text-red-400' : 'bg-emerald-500/20 text-emerald-400'} flex items-center justify-center font-bold text-sm">
+                        <i class="fa-solid ${isBuwuhan ? 'fa-hand-holding-heart' : 'fa-bell'}"></i>
+                    </div>
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <h4 class="font-bold text-white text-xs">${escapeHtml(title)}</h4>
+                            ${getStatusBadgeMarkup(diff)}
+                        </div>
+                        <p class="text-[11px] text-slate-400 mt-0.5">
+                            Tanggal: <b>${formatDateIndo(dateStr)}</b> ${isBuwuhan ? `• Rencana: ${item.tipe === 'UANG' ? 'Rp ' + Number(item.nominal).toLocaleString('id-ID') : item.keterangan}` : ''}
+                        </p>
+                    </div>
+                </div>
+                <button onclick="${isBuwuhan ? `triggerWaBuwuhanById('${item.id}')` : `triggerWaReminderById('${item.id}')`}" class="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs px-3 py-1.5 rounded-xl flex items-center justify-center gap-1.5 shadow">
+                    <i class="fa-brands fa-whatsapp text-sm"></i> Kirim WA
+                </button>
+            `;
+            return div;
+        }
+
+        function renderBuwuhanTab() {
+            const grid = document.getElementById('buwuhanGrid');
+            const search = document.getElementById('searchBuwuhanInput').value.toLowerCase();
+            grid.innerHTML = '';
+
+            let filtered = buwuhanList.filter(item => {
+                const matchSearch = item.nama.toLowerCase().includes(search) || (item.alamat && item.alamat.toLowerCase().includes(search));
+                const matchTab = currentBuwuhanFilter === 'ALL' || item.arah === currentBuwuhanFilter;
+                return matchSearch && matchTab;
+            });
+
+            if (filtered.length === 0) {
+                grid.innerHTML = `
+                    <div class="col-span-full text-center py-10 glass-panel rounded-2xl">
+                        <i class="fa-solid fa-book-open text-slate-600 text-3xl mb-2"></i>
+                        <p class="text-xs font-bold text-slate-300">Belum Ada Catatan Buwuhan</p>
+                    </div>
+                `;
+                return;
+            }
+
+            filtered.forEach(item => {
+                const diff = getDaysDiff(item.tanggal);
+                const isKeluar = item.arah === 'KELUAR';
+                const card = document.createElement('div');
+                card.className = "glass-card rounded-2xl p-4 sm:p-5 flex flex-col justify-between space-y-3";
+
+                const hBadges = (item.hOptions || [3,1,0]).map(h => `<span class="bg-slate-950 border border-slate-800 text-slate-400 text-[9px] px-1.5 py-0.5 rounded">H-${h}</span>`).join(' ');
+
+                card.innerHTML = `
+                    <div>
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="text-[9px] font-bold px-2 py-0.5 rounded-full ${isKeluar ? 'bg-amber-500/10 text-amber-400 border border-amber-500/30' : 'bg-sky-500/10 text-sky-400 border border-sky-500/30'}">
+                                ${isKeluar ? 'KONDANGAN BALASAN' : 'AMPLOP MASUK'}
+                            </span>
+                            <div class="flex items-center gap-1">
+                                <button onclick="triggerWaBuwuhanById('${item.id}')" title="Kirim WA" class="p-1 hover:bg-slate-800 text-emerald-400 rounded">
+                                    <i class="fa-brands fa-whatsapp text-sm"></i>
+                                </button>
+                                <button onclick="editBuwuhan('${item.id}')" title="Edit" class="p-1 hover:bg-slate-800 text-slate-400 rounded">
+                                    <i class="fa-solid fa-pen text-xs"></i>
+                                </button>
+                                <button onclick="window.deleteBuwuhan('${item.id}')" title="Hapus" class="p-1 hover:bg-red-950 text-red-400 rounded">
+                                    <i class="fa-solid fa-trash text-xs"></i>
+                                </button>
+                            </div>
+                        </div>
+
+                        <h3 class="font-bold text-white text-sm sm:text-base">${escapeHtml(item.nama)}</h3>
+                        <p class="text-[11px] text-slate-400 font-mono mb-2">${escapeHtml(item.alamat || 'Alamat -')} • ${formatDateIndo(item.tanggal)}</p>
+
+                        <div class="bg-slate-950/70 p-3 rounded-xl border border-slate-800/80 text-xs space-y-1 mb-2">
+                            <p class="text-slate-300">Acara: <b>${escapeHtml(item.acara)}</b></p>
+                            <p class="text-emerald-400 font-bold">
+                                ${item.tipe === 'UANG' ? 'Rp ' + Number(item.nominal).toLocaleString('id-ID') : escapeHtml(item.keterangan)}
+                            </p>
+                        </div>
+
+                        ${item.histori ? `
+                            <p class="text-[10px] text-slate-400 italic bg-slate-900/50 p-2 rounded-lg border border-slate-800/60 mb-2">
+                                "${escapeHtml(item.histori)}"
+                            </p>
+                        ` : ''}
+
+                        <div class="flex items-center gap-1 mt-1">
+                            <span class="text-[9px] text-slate-500">Notif WA:</span>
+                            ${hBadges}
+                        </div>
+                    </div>
+
+                    <div class="pt-3 border-t border-slate-800/80 flex items-center justify-between">
+                        ${getStatusBadgeMarkup(diff)}
+                        ${!isKeluar ? `
+                            <button onclick="openBuwuhanModal('KELUAR', '${escapeHtml(item.nama)}')" class="bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/30 text-[10px] font-bold px-2.5 py-1 rounded-lg transition-all">
+                                🔁 Balas Kondangan Ini
+                            </button>
+                        ` : ''}
+                    </div>
+                `;
+                grid.appendChild(card);
+            });
+        }
+
+        function filterBuwuhanTab(type) {
+            currentBuwuhanFilter = type;
+            ['ALL', 'MASUK', 'KELUAR'].forEach(t => {
+                const btn = document.getElementById(`buwFilter-${t}`);
+                if (t === type) {
+                    btn.className = "flex-1 sm:flex-none px-3 py-1.5 rounded-lg text-xs font-bold text-white bg-emerald-600 transition-all";
+                } else {
+                    btn.className = "flex-1 sm:flex-none px-3 py-1.5 rounded-lg text-xs font-bold text-slate-400 hover:text-white transition-all";
+                }
+            });
+            renderBuwuhanTab();
+        }
+
+        function renderRemindersTab() {
+            const grid = document.getElementById('remindersGrid');
+            const typeFilter = document.getElementById('filterReminderType').value;
+            const repeatFilter = document.getElementById('filterReminderRepeat').value;
+            grid.innerHTML = '';
+
+            let filtered = remindersList.filter(r => {
+                const matchType = typeFilter === 'ALL' || r.type === typeFilter;
+                const matchRepeat = repeatFilter === 'ALL' || r.repeat === repeatFilter;
+                return matchType && matchRepeat;
+            });
+
+            if (filtered.length === 0) {
+                grid.innerHTML = `
+                    <div class="col-span-full text-center py-10 glass-panel rounded-2xl">
+                        <i class="fa-solid fa-bell-slash text-slate-600 text-3xl mb-2"></i>
+                        <p class="text-xs font-bold text-slate-300">Tidak Ada Pengingat Ditemukan</p>
+                    </div>
+                `;
+                return;
+            }
+
+            filtered.forEach(item => {
+                const diff = getDaysDiff(item.date);
+                const isPermanent = item.type === 'permanent';
+                const card = document.createElement('div');
+                card.className = "glass-card rounded-2xl p-4 sm:p-5 flex flex-col justify-between space-y-3";
+
+                const hBadges = (item.hOptions || [3,1,0]).map(h => `<span class="bg-slate-950 border border-slate-800 text-slate-400 text-[9px] px-1.5 py-0.5 rounded">H-${h}</span>`).join(' ');
+
+                card.innerHTML = `
+                    <div>
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="text-[9px] font-bold px-2 py-0.5 rounded-full ${isPermanent ? 'bg-purple-500/10 text-purple-300 border border-purple-500/30' : 'bg-sky-500/10 text-sky-400 border border-sky-500/30'}">
+                                ${isPermanent ? '🔒 PERMANEN' : '✏️ FLEKSIBEL'}
+                            </span>
+                            <div class="flex items-center gap-1">
+                                <button onclick="triggerWaReminderById('${item.id}')" title="Kirim WA" class="p-1 hover:bg-slate-800 text-sky-400 rounded">
+                                    <i class="fa-brands fa-whatsapp text-sm"></i>
+                                </button>
+                                <button onclick="editReminder('${item.id}')" title="Edit" class="p-1 hover:bg-slate-800 text-slate-400 rounded">
+                                    <i class="fa-solid fa-pen text-xs"></i>
+                                </button>
+                                <button onclick="window.deleteReminder('${item.id}')" title="Hapus" class="p-1 hover:bg-red-950 text-red-400 rounded">
+                                    <i class="fa-solid fa-trash text-xs"></i>
+                                </button>
+                            </div>
+                        </div>
+
+                        <h3 class="font-bold text-white text-sm sm:text-base">${escapeHtml(item.title)}</h3>
+                        <p class="text-[11px] text-slate-400 font-mono mb-2">
+                            ${formatDateIndo(item.date)} • <span class="capitalize text-slate-300">${item.repeat}</span>
+                        </p>
+
+                        ${item.notes ? `
+                            <p class="text-[11px] text-slate-300 bg-slate-950/70 p-2.5 rounded-xl border border-slate-800/80 mb-2">
+                                ${escapeHtml(item.notes)}
+                            </p>
+                        ` : ''}
+
+                        <div class="flex items-center gap-1 mt-1">
+                            <span class="text-[9px] text-slate-500">Notif WA:</span>
+                            ${hBadges}
+                        </div>
+                    </div>
+
+                    <div class="pt-3 border-t border-slate-800/80 flex items-center justify-between">
+                        ${getStatusBadgeMarkup(diff)}
+                        <button onclick="triggerWaReminderById('${item.id}')" class="bg-sky-600 hover:bg-sky-500 text-white font-bold text-[10px] px-3 py-1.5 rounded-lg shadow">
+                            Tes Notif WA
+                        </button>
+                    </div>
+                `;
+                grid.appendChild(card);
+            });
+        }
+
+        // --- ACTIONS: BUWUHAN FORM & AUTO-FILL ---
+        function openBuwuhanModal(direction = 'MASUK', presetName = '') {
+            document.getElementById('buwuhanId').value = '';
+            document.getElementById('buwArah').value = direction;
+            document.getElementById('buwNama').value = presetName;
+            document.getElementById('buwAlamat').value = '';
+            document.getElementById('buwAcara').value = '';
+            document.getElementById('buwTanggal').value = getFutureDateISO(1);
+            document.getElementById('buwTipe').value = 'UANG';
+            document.getElementById('buwNominal').value = '100000';
+            document.getElementById('buwKeterangan').value = '';
+            document.getElementById('buwHistori').value = '';
+
+            handleArahChange();
+            if (presetName) applyQuickSelectNeighbor(presetName);
+
+            openModal('buwuhanModal');
+        }
+
+        function handleArahChange() {
+            const arah = document.getElementById('buwArah').value;
+            const quickBox = document.getElementById('quickSelectBox');
+            const selectEl = document.getElementById('buwQuickSelect');
+
+            if (arah === 'KELUAR') {
+                quickBox.classList.remove('hidden');
+                selectEl.innerHTML = '<option value="">-- Pilih Nama Tetangga Yang Pernah Nyumbang --</option>';
+
+                const masukEntries = buwuhanList.filter(b => b.arah === 'MASUK');
+                masukEntries.forEach(m => {
+                    const opt = document.createElement('option');
+                    opt.value = m.nama;
+                    opt.textContent = `${m.nama} (${m.tipe === 'UANG' ? 'Rp ' + Number(m.nominal).toLocaleString('id-ID') : m.keterangan})`;
+                    selectEl.appendChild(opt);
+                });
+            } else {
+                quickBox.classList.add('hidden');
+            }
+        }
+
+        function applyQuickSelectNeighbor(name) {
+            if (!name) return;
+            document.getElementById('buwNama').value = name;
+            
+            const match = buwuhanList.find(b => b.nama.toLowerCase() === name.toLowerCase() && b.arah === 'MASUK');
+            if (match) {
+                if (match.alamat) document.getElementById('buwAlamat').value = match.alamat;
+                document.getElementById('buwTipe').value = match.tipe;
+                toggleTipeInput();
+
+                if (match.tipe === 'UANG') {
+                    document.getElementById('buwNominal').value = match.nominal;
+                } else {
+                    document.getElementById('buwKeterangan').value = match.keterangan;
+                }
+
+                document.getElementById('buwHistori').value = `${match.nama} dulu pernah nyumbang ${match.tipe === 'UANG' ? 'Rp ' + Number(match.nominal).toLocaleString('id-ID') : match.keterangan} di acara ${match.acara}`;
+            }
+        }
+
+        function autoLookupHistory(name) {
+            if (!name) return;
+            const match = buwuhanList.find(b => b.nama.toLowerCase() === name.toLowerCase());
+            if (match) {
+                document.getElementById('buwHistori').value = `Histori: ${match.nama} dulu ${match.arah === 'MASUK' ? 'nyumbang' : 'dibuwuhi'} ${match.tipe === 'UANG' ? 'Rp ' + Number(match.nominal).toLocaleString('id-ID') : match.keterangan} (${match.acara})`;
+            }
+        }
+
+        function toggleTipeInput() {
+            const tipe = document.getElementById('buwTipe').value;
+            if (tipe === 'UANG') {
+                document.getElementById('nominalBox').classList.remove('hidden');
+                document.getElementById('barangBox').classList.add('hidden');
+            } else {
+                document.getElementById('nominalBox').classList.add('hidden');
+                document.getElementById('barangBox').classList.remove('hidden');
+            }
+        }
+
+        function handleSaveBuwuhan(e) {
+            e.preventDefault();
+            const id = document.getElementById('buwuhanId').value || 'buw_' + Date.now();
+            const arah = document.getElementById('buwArah').value;
+            const nama = document.getElementById('buwNama').value.trim();
+            const alamat = document.getElementById('buwAlamat').value.trim();
+            const acara = document.getElementById('buwAcara').value.trim();
+            const tanggal = document.getElementById('buwTanggal').value;
+            const tipe = document.getElementById('buwTipe').value;
+            const nominal = parseInt(document.getElementById('buwNominal').value) || 0;
+            const keterangan = document.getElementById('buwKeterangan').value.trim();
+            const histori = document.getElementById('buwHistori').value.trim();
+
+            const hBoxes = document.getElementsByName('buwHOption');
+            let hOptions = [];
+            for (let box of hBoxes) {
+                if (box.checked) hOptions.push(parseInt(box.value));
+            }
+
+            const itemObj = {
+                id, arah, nama, alamat, acara, tanggal, tipe, nominal, keterangan, histori, hOptions
+            };
+
+            const index = buwuhanList.findIndex(b => b.id === id);
+            if (index >= 0) {
+                buwuhanList[index] = itemObj;
+                showToast('Catatan buwuhan diperbarui!', 'success');
+            } else {
+                buwuhanList.unshift(itemObj);
+                showToast('Catatan buwuhan ditambahkan!', 'success');
+            }
+
+            syncBuwuhanToCloud(itemObj);
+            closeModal('buwuhanModal');
+            renderAllTabs();
+        }
+
+        function editBuwuhan(id) {
+            const item = buwuhanList.find(b => b.id === id);
+            if (!item) return;
+
+            document.getElementById('buwuhanId').value = item.id;
+            document.getElementById('buwArah').value = item.arah;
+            document.getElementById('buwNama').value = item.nama;
+            document.getElementById('buwAlamat').value = item.alamat || '';
+            document.getElementById('buwAcara').value = item.acara;
+            document.getElementById('buwTanggal').value = item.tanggal;
+            document.getElementById('buwTipe').value = item.tipe;
+            document.getElementById('buwNominal').value = item.nominal || 0;
+            document.getElementById('buwKeterangan').value = item.keterangan || '';
+            document.getElementById('buwHistori').value = item.histori || '';
+
+            toggleTipeInput();
+
+            const hBoxes = document.getElementsByName('buwHOption');
+            for (let box of hBoxes) {
+                box.checked = (item.hOptions || [3,1,0]).includes(parseInt(box.value));
+            }
+
+            openModal('buwuhanModal');
+        }
+
+        // --- ACTIONS: REMINDERS FORM ---
+        function openReminderModal() {
+            document.getElementById('remId').value = '';
+            document.getElementById('remTitle').value = '';
+            document.getElementById('remNotes').value = '';
+            document.getElementById('remDate').value = getFutureDateISO(3);
+
+            openModal('reminderModal');
+        }
+
+        function handleSaveReminder(e) {
+            e.preventDefault();
+            const id = document.getElementById('remId').value || 'rem_' + Date.now();
+            const type = document.getElementById('remType').value;
+            const title = document.getElementById('remTitle').value.trim();
+            const repeat = document.getElementById('remRepeat').value;
+            const date = document.getElementById('remDate').value;
+            const notes = document.getElementById('remNotes').value.trim();
+
+            const hBoxes = document.getElementsByName('remHOption');
+            let hOptions = [];
+            for (let box of hBoxes) {
+                if (box.checked) hOptions.push(parseInt(box.value));
+            }
+
+            const itemObj = { id, type, title, repeat, date, notes, hOptions };
+
+            const index = remindersList.findIndex(r => r.id === id);
+            if (index >= 0) {
+                remindersList[index] = itemObj;
+                showToast('Pengingat diperbarui!', 'success');
+            } else {
+                remindersList.unshift(itemObj);
+                showToast('Pengingat baru dibuat!', 'success');
+            }
+
+            syncReminderToCloud(itemObj);
+            closeModal('reminderModal');
+            renderAllTabs();
+        }
+
+        function editReminder(id) {
+            const item = remindersList.find(r => r.id === id);
+            if (!item) return;
+
+            document.getElementById('remId').value = item.id;
+            document.getElementById('remType').value = item.type;
+            document.getElementById('remTitle').value = item.title;
+            document.getElementById('remRepeat').value = item.repeat;
+            document.getElementById('remDate').value = item.date;
+            document.getElementById('remNotes').value = item.notes || '';
+
+            const hBoxes = document.getElementsByName('remHOption');
+            for (let box of hBoxes) {
+                box.checked = (item.hOptions || [3,1,0]).includes(parseInt(box.value));
+            }
+
+            openModal('reminderModal');
+        }
+
+        // --- FONNTE WA DISPATCH LOGIC ---
+        function triggerWaBuwuhanById(id) {
+            const item = buwuhanList.find(b => b.id === id);
+            if (item) triggerWaBuwuhan(item);
+        }
+
+        function triggerWaBuwuhan(item) {
+            if (!appSettings.waNumber || !appSettings.fonnteToken) {
+                showToast('Token Fonnte & No WA belum diset di Pengaturan!', 'error');
+                switchTab('settings');
+                return;
+            }
+
+            const diff = getDaysDiff(item.tanggal);
+            const statusText = diff === 0 ? 'HARI H (HARI INI! 🎉)' : diff > 0 ? `H-${diff}` : 'Lewat';
+            const sumbanganText = item.tipe === 'UANG' ? `Rp ${Number(item.nominal).toLocaleString('id-ID')}` : item.keterangan;
+
+            const pesan = 
+                `⚠️ *PENGINGAT BUWUHAN HAJATAN (DESA)* ⚠️\n\n` +
+                `Halo! Jangan lupa jadwal hajatan tetangga/saudara:\n` +
+                `👤 *Nama:* ${item.nama} (${item.alamat || '-'})\n` +
+                `🎉 *Acara:* ${item.acara}\n` +
+                `📅 *Tanggal:* ${formatDateIndo(item.tanggal)} (${statusText})\n` +
+                `💰 *Rencana Buwuhan:* ${sumbanganText}\n\n` +
+                `📜 *Histori Pemberian Lalu:* \n"${item.histori || 'Belum ada catatan histori.'}"\n\n` +
+                `_Pesan otomatis via Remind & Buwuhan Fonnte Gateway._`;
+
+            activeDispatchPayload = { phone: appSettings.waNumber, message: pesan };
+            showPreviewDispatchModal(appSettings.waNumber, pesan);
+        }
+
+        function triggerWaReminderById(id) {
+            const item = remindersList.find(r => r.id === id);
+            if (item) triggerWaReminder(item);
+        }
+
+        function triggerWaReminder(item) {
+            if (!appSettings.waNumber || !appSettings.fonnteToken) {
+                showToast('Token Fonnte & No WA belum diset di Pengaturan!', 'error');
+                switchTab('settings');
+                return;
+            }
+
+            const diff = getDaysDiff(item.date);
+            const statusText = diff === 0 ? 'HARI H 🎉' : diff > 0 ? `H-${diff}` : 'Lewat';
+
+            const pesan = 
+                `🔔 *PENGINGAT JADWAL PERMANEN / UMUM* 🔔\n\n` +
+                `Halo! Ini notifikasi pengingat Anda:\n` +
+                `📌 *Event:* ${item.title}\n` +
+                `📅 *Tanggal:* ${formatDateIndo(item.date)} (${statusText})\n` +
+                `🔄 *Siklus:* ${item.repeat}\n\n` +
+                `📝 *Catatan Persiapan:*\n"${item.notes || '-'}"\n\n` +
+                `_Pesan otomatis via Remind & Buwuhan Fonnte Gateway._`;
+
+            activeDispatchPayload = { phone: appSettings.waNumber, message: pesan };
+            showPreviewDispatchModal(appSettings.waNumber, pesan);
+        }
+
+        function showPreviewDispatchModal(phone, msg) {
+            document.getElementById('previewWaPhone').textContent = '+' + phone;
+            document.getElementById('previewWaMessage').textContent = msg;
+            openModal('dispatchModal');
+        }
+
+        function executeFonnteSend() {
+            if (!activeDispatchPayload) return;
+
+            showToast('Mengirim notifikasi via Fonnte API...', 'info');
+
+            const formData = new FormData();
+            formData.append('target', activeDispatchPayload.phone);
+            formData.append('message', activeDispatchPayload.message);
+
+            fetch('https://api.fonnte.com/send', {
+                method: 'POST',
+                headers: { 'Authorization': appSettings.fonnteToken },
+                body: formData
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.status) {
+                    showToast('Pesan WhatsApp BERHASIL dikirim via Fonnte!', 'success');
+                    closeModal('dispatchModal');
+                } else {
+                    showToast('Gagal Kirim Fonnte: ' + (data.reason || 'Cek Token Fonnte Anda'), 'error');
+                }
+            })
+            .catch(err => {
+                showToast('Terjadi kesalahan koneksi ke Fonnte API.', 'error');
+            });
+        }
+
+        function checkAutoTodayAlerts() {
+            const urgentBuw = buwuhanList.filter(b => (b.hOptions || [3,1,0]).includes(getDaysDiff(b.tanggal)));
+            const urgentRem = remindersList.filter(r => (r.hOptions || [3,1,0]).includes(getDaysDiff(r.date)));
+            const total = urgentBuw.length + urgentRem.length;
+
+            if (total > 0 && appSettings.waNumber) {
+                showToast(`Terdapat ${total} jadwal pengingat WA aktif hari ini!`, 'info');
+            }
+        }
+
+        function triggerAutoSendAllToday() {
+            const urgentBuw = buwuhanList.filter(b => (b.hOptions || [3,1,0]).includes(getDaysDiff(b.tanggal)));
+            const urgentRem = remindersList.filter(r => (r.hOptions || [3,1,0]).includes(getDaysDiff(r.date)));
+
+            if (urgentBuw.length === 0 && urgentRem.length === 0) {
+                showToast('Tidak ada pengingat WA yang masuk jadwal hari ini.', 'info');
+                return;
+            }
+
+            if (urgentBuw.length > 0) triggerWaBuwuhan(urgentBuw[0]);
+            else if (urgentRem.length > 0) triggerWaReminder(urgentRem[0]);
+        }
+
+        // --- NAVIGATION & UTILS ---
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+            document.getElementById(`tab-${tabId}`).classList.remove('hidden');
+
+            const buttons = ['dashboard', 'buwuhan', 'reminders', 'settings'];
+            buttons.forEach(b => {
+                const btn = document.getElementById(`dock-${b}`);
+                if (btn) {
+                    if (b === tabId) {
+                        btn.className = "dock-btn flex flex-col items-center gap-1 text-[10px] font-bold text-emerald-400 scale-105 transition-all";
+                    } else {
+                        btn.className = "dock-btn flex flex-col items-center gap-1 text-[10px] font-bold text-slate-400 hover:text-white transition-all";
+                    }
+                }
+            });
+
+            if (tabId === 'buwuhan') renderBuwuhanTab();
+            if (tabId === 'reminders') renderRemindersTab();
+        }
+
+        function openModal(id) { document.getElementById(id).classList.remove('hidden'); }
+        function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
+
+        function showToast(msg, type = 'info') {
+            const container = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+
+            const bg = type === 'success' ? 'bg-emerald-950/90 border-emerald-500/50 text-emerald-300' : type === 'error' ? 'bg-red-950/90 border-red-500/50 text-red-300' : 'bg-slate-900/90 border-slate-700 text-slate-200';
+            const icon = type === 'success' ? 'fa-circle-check text-emerald-400' : type === 'error' ? 'fa-circle-exclamation text-red-400' : 'fa-circle-info text-sky-400';
+
+            toast.className = `${bg} text-xs px-4 py-3 rounded-2xl shadow-2xl flex items-center justify-between gap-3 border backdrop-blur-md pointer-events-auto transition-all`;
+            toast.innerHTML = `
+                <div class="flex items-center gap-2">
+                    <i class="fa-solid ${icon}"></i>
+                    <span>${escapeHtml(msg)}</span>
+                </div>
+                <button onclick="this.parentElement.remove()" class="text-slate-400 hover:text-white">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            `;
+
+            container.appendChild(toast);
+            setTimeout(() => { if (toast) toast.remove(); }, 3500);
+        }
+
+        function escapeHtml(str) {
+            if (!str) return '';
+            return String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+        }
+    </script>
+</body>
+</html>
